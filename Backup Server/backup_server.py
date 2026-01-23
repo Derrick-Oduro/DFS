@@ -62,6 +62,22 @@ def handle_replication(client_socket, addr):
             client_socket.send(data.encode())
             print(f"[+] Served file from backup: {filename}")
         
+        # -------- DELETE FROM BACKUP --------
+        elif command.startswith("DELETE"):
+            _, filename = command.split()
+            filepath = os.path.join(STORAGE_DIR, filename)
+            
+            if not os.path.exists(filepath):
+                client_socket.send("ERROR: File not found".encode())
+                return
+            
+            lock = get_lock(filename)
+            with lock:
+                os.remove(filepath)
+            
+            client_socket.send("Delete successful".encode())
+            print(f"[+] Deleted file from backup: {filename}")
+        
         # -------- LIST BACKUP FILES --------
         elif command == "LIST":
             files = os.listdir(STORAGE_DIR)
@@ -83,15 +99,26 @@ def handle_replication(client_socket, addr):
 
 # ---------------- SERVER SETUP ----------------
 backup_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+backup_server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 backup_server.bind((BACKUP_SERVER_IP, BACKUP_PORT))
 backup_server.listen(5)
 
 print(f"Backup Server running on port {BACKUP_PORT}...")
+print(f"Storage directory: {STORAGE_DIR}")
 
 while True:
-    client_socket, addr = backup_server.accept()
-    replication_thread = threading.Thread(
-        target=handle_replication,
-        args=(client_socket, addr)
-    )
-    replication_thread.start()
+    try:
+        client_socket, addr = backup_server.accept()
+        replication_thread = threading.Thread(
+            target=handle_replication,
+            args=(client_socket, addr)
+        )
+        replication_thread.daemon = True
+        replication_thread.start()
+    except KeyboardInterrupt:
+        print("\n[!] Backup server shutting down...")
+        break
+    except Exception as e:
+        print(f"[!] Server error: {str(e)}")
+
+backup_server.close()
