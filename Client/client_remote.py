@@ -3,10 +3,13 @@ import time
 import os
 import json
 
-SERVER_IP = "127.0.0.1"
+# ============ REMOTE CLIENT CONFIGURATION ============
+# Replace this IP with the server PC's IP address
+SERVER_IP = "172.20.10.2"  # <-- Server's IP Address
 PORT = 9000
-BACKUP_SERVER_IP = "127.0.0.1"
+BACKUP_SERVER_IP = "172.20.10.2"  # <-- Server's IP Address
 BACKUP_PORT = 9001
+
 CACHE_DIR = "cache"
 CACHE_FILE = os.path.join(CACHE_DIR, "file_cache.json")
 
@@ -123,7 +126,9 @@ def send_command(command, data=None, use_backup=False):
     return "ERROR: Could not connect to server after multiple attempts"
 
 # ---------------- CLIENT INTERFACE ----------------
-print("=== Distributed File System Client ===")
+print("=== Distributed File System - REMOTE CLIENT ===")
+print(f"Connecting to server at: {SERVER_IP}:{PORT}")
+print(f"Backup server at: {BACKUP_SERVER_IP}:{BACKUP_PORT}")
 print("Features: Caching, Automatic Failover, Replication\n")
 
 while True:
