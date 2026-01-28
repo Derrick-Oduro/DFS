@@ -24,7 +24,7 @@ def handle_replication(client_socket, addr):
         command = client_socket.recv(1024).decode().strip()
         
         # -------- REPLICATE WRITE --------
-        if command.startswith("REPLICATE"):
+        if command.startswith("REPLICATE "):
             _, filename = command.split(maxsplit=1)
             filepath = os.path.join(STORAGE_DIR, filename)
             
@@ -44,6 +44,33 @@ def handle_replication(client_socket, addr):
             
             client_socket.send("Replication successful".encode())
             print(f"[+] Replicated file: {filename}")
+        
+        # -------- REPLICATE BINARY FILES --------
+        elif command.startswith("REPLICATE_BINARY"):
+            parts = command.split()
+            filename = parts[1]
+            filesize = int(parts[2])
+            filepath = os.path.join(STORAGE_DIR, filename)
+            
+            lock = get_lock(filename)
+            client_socket.send("READY".encode())
+            
+            # Receive binary data
+            received = 0
+            file_data = b""
+            while received < filesize:
+                chunk = client_socket.recv(min(4096, filesize - received))
+                if not chunk:
+                    break
+                file_data += chunk
+                received += len(chunk)
+            
+            with lock:
+                with open(filepath, "wb") as f:
+                    f.write(file_data)
+            
+            client_socket.send("Binary replication successful".encode())
+            print(f"[+] Replicated binary file: {filename} ({filesize} bytes)")
         
         # -------- READ FROM BACKUP --------
         elif command.startswith("READ"):

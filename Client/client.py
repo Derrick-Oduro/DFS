@@ -222,7 +222,7 @@ def download_file(filename, save_path=None):
     return "ERROR: Could not download file after multiple attempts"
 
 # ---------------- CLIENT INTERFACE ----------------
-print("=== Distributed File System Client ===")
+print("== Distributed File System Client ==")
 print("Features: Caching, Automatic Failover, Replication, File Transfer\n")
 
 while True:

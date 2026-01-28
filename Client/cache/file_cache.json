@@ -1,1 +1,10 @@
-{}
+{
+  "test.txt": {
+    "content": "I have edited this file",
+    "timestamp": 1769148617.005644
+  },
+  "name.txt": {
+    "content": "hello world",
+    "timestamp": 1769175424.0878901
+  }
+}

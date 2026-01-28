@@ -67,12 +67,10 @@ def handle_client(client_socket, addr):
         
         command = client_socket.recv(1024).decode().strip()
 
-        # -------- LIST --------
         if command == "LIST":
             files = os.listdir(STORAGE_DIR)
             client_socket.send(str(files).encode())
 
-        # -------- READ --------
         elif command.startswith("READ"):
             _, filename = command.split()
             filepath = os.path.join(STORAGE_DIR, filename)
@@ -88,7 +86,6 @@ def handle_client(client_socket, addr):
 
             client_socket.send(data.encode())
 
-        # -------- WRITE --------
         elif command.startswith("WRITE"):
             _, filename = command.split()
             filepath = os.path.join(STORAGE_DIR, filename)
@@ -137,13 +134,29 @@ def handle_client(client_socket, addr):
                 with open(filepath, "wb") as f:
                     f.write(file_data)
 
-            # Replicate to backup server (convert bytes to string for text files, or handle binary)
-            threading.Thread(target=replicate_to_backup, args=(filename, file_data.decode('utf-8', errors='ignore'))).start()
+            # Replicate binary data to backup server (keep as bytes)
+            def replicate_binary(filename, data):
+                try:
+                    backup_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    backup_socket.settimeout(5)
+                    backup_socket.connect((BACKUP_SERVER_IP, BACKUP_PORT))
+                    
+                    backup_socket.send(f"REPLICATE_BINARY {filename} {len(data)}".encode())
+                    response = backup_socket.recv(1024).decode()
+                    
+                    if response == "READY":
+                        backup_socket.sendall(data)  # Send binary data
+                        result = backup_socket.recv(1024).decode()
+                        backup_socket.close()
+                        print(f"[+] Binary file replicated to backup: {filename}")
+                except Exception as e:
+                    print(f"[!] Binary replication failed: {str(e)}")
+            
+            threading.Thread(target=replicate_binary, args=(filename, file_data)).start()
 
             client_socket.send(f"Upload successful: {filename} ({filesize} bytes) - replicated to backup".encode())
             print(f"[+] File uploaded: {filename} ({filesize} bytes) from {addr}")
 
-        # -------- DOWNLOAD --------
         elif command.startswith("DOWNLOAD"):
             _, filename = command.split()
             filepath = os.path.join(STORAGE_DIR, filename)
@@ -169,7 +182,6 @@ def handle_client(client_socket, addr):
             
             print(f"[+] File downloaded: {filename} ({filesize} bytes) by {addr}")
 
-        # -------- DELETE --------
         elif command.startswith("DELETE"):
             _, filename = command.split()
             filepath = os.path.join(STORAGE_DIR, filename)
