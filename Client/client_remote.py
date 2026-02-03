@@ -4,16 +4,15 @@ import os
 import json
 
 # ============ REMOTE CLIENT CONFIGURATION ============
-# Replace this IP with the server PC's IP address
-SERVER_IP = "172.20.10.2"  # <-- Updated to current IP
+SERVER_IP = "172.20.10.2"
 PORT = 9000
-BACKUP_SERVER_IP = "172.20.10.2"  # <-- Updated to current IP
+BACKUP_SERVER_IP = "172.20.10.2"
 BACKUP_PORT = 9001
 
 CACHE_DIR = "cache"
 CACHE_FILE = os.path.join(CACHE_DIR, "file_cache.json")
 
-# Create cache directory
+# cache directory
 os.makedirs(CACHE_DIR, exist_ok=True)
 
 # ---------------- CACHE MANAGEMENT ----------------

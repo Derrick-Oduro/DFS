@@ -95,15 +95,23 @@ def send_command(command, data=None, use_backup=False):
         except (socket.timeout, ConnectionRefusedError, OSError) as e:
             print(f"[!] Connection attempt {attempt + 1} failed: {str(e)}")
             
-            if not use_backup and command.startswith("READ") and attempt == max_retries - 1:
-                print("[!] Trying backup server...")
-                return send_command(command, data, use_backup=True)
-            
-            if command.startswith("READ") and attempt == max_retries - 1:
-                filename = command.split()[1]
-                cached_content = get_from_cache(filename)
-                if cached_content:
-                    return f"[FROM CACHE]\n{cached_content}"
+            # Last attempt: try failover for READ, LIST, WRITE, APPEND, DELETE
+            if attempt == max_retries - 1:
+                # Try backup server for these operations
+                if (command.startswith("READ") or 
+                    command.startswith("WRITE") or 
+                    command.startswith("APPEND") or 
+                    command.startswith("DELETE") or 
+                    command == "LIST") and not use_backup:
+                    print("[!] Trying backup server...")
+                    return send_command(command, data, use_backup=True)
+                
+                # Try cache for READ only
+                if command.startswith("READ"):
+                    filename = command.split()[1]
+                    cached_content = get_from_cache(filename)
+                    if cached_content:
+                        return f"[FROM CACHE]\n{cached_content}"
             
             if attempt < max_retries - 1:
                 time.sleep(retry_delay)
@@ -120,7 +128,7 @@ def send_command(command, data=None, use_backup=False):
     
     return "ERROR: Could not connect to server after multiple attempts"
 
-def upload_file(filepath):
+def upload_file(filepath, use_backup=False):
     """Upload a file to the server"""
     if not os.path.exists(filepath):
         return "ERROR: File not found on local system"
@@ -128,12 +136,15 @@ def upload_file(filepath):
     filename = os.path.basename(filepath)
     filesize = os.path.getsize(filepath)
     
+    server_ip = BACKUP_SERVER_IP if use_backup else SERVER_IP
+    port = BACKUP_PORT if use_backup else PORT
+    
     max_retries = 3
     for attempt in range(max_retries):
         try:
             client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             client.settimeout(30)
-            client.connect((SERVER_IP, PORT))
+            client.connect((server_ip, port))
             
             # Send upload command
             client.send(f"UPLOAD {filename} {filesize}".encode())
@@ -158,6 +169,12 @@ def upload_file(filepath):
         
         except Exception as e:
             print(f"[!] Upload attempt {attempt + 1} failed: {str(e)}")
+            
+            # Try backup server on last attempt
+            if attempt == max_retries - 1 and not use_backup:
+                print("[!] Trying backup server...")
+                return upload_file(filepath, use_backup=True)
+            
             if attempt < max_retries - 1:
                 time.sleep(2)
         finally:
@@ -168,17 +185,20 @@ def upload_file(filepath):
     
     return "ERROR: Could not upload file after multiple attempts"
 
-def download_file(filename, save_path=None):
+def download_file(filename, save_path=None, use_backup=False):
     """Download a file from the server"""
     if save_path is None:
         save_path = filename
+    
+    server_ip = BACKUP_SERVER_IP if use_backup else SERVER_IP
+    port = BACKUP_PORT if use_backup else PORT
     
     max_retries = 3
     for attempt in range(max_retries):
         try:
             client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             client.settimeout(30)
-            client.connect((SERVER_IP, PORT))
+            client.connect((server_ip, port))
             
             client.send(f"DOWNLOAD {filename}".encode())
             response = client.recv(1024).decode()
@@ -211,6 +231,12 @@ def download_file(filename, save_path=None):
         
         except Exception as e:
             print(f"[!] Download attempt {attempt + 1} failed: {str(e)}")
+            
+            # Try backup server on last attempt
+            if attempt == max_retries - 1 and not use_backup:
+                print("[!] Trying backup server...")
+                return download_file(filename, save_path, use_backup=True)
+            
             if attempt < max_retries - 1:
                 time.sleep(2)
         finally:
